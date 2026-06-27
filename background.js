@@ -1,25 +1,33 @@
-let offscreenDocument = null;
 let isRecording = false;
 let currentPlayerState = 'stopped';
+let creating = null; // A global promise to avoid concurrency issues
 
-// Create or get the offscreen document
 async function setupOffscreenDocument() {
-  // Check if we already have an offscreen document
+  // Check all windows controlled by the service worker to see if one
+  // of them is the offscreen document with the given path
+  const path = './offscreen.html';
+  const offscreenUrl = chrome.runtime.getURL(path);
   const existingContexts = await chrome.runtime.getContexts({
-    contextTypes: ['OFFSCREEN_DOCUMENT']
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [offscreenUrl],
   });
 
   if (existingContexts.length > 0) {
-    offscreenDocument = existingContexts[0];
     return;
   }
 
-  // Create an offscreen document
-  await chrome.offscreen.createDocument({
-    url: 'offscreen.html',
-    reasons: ['AUDIO_PLAYBACK'],
-    justification: 'Playing TTS audio in the background'
-  });
+  // create offscreen document
+  if (creating) {
+    await creating;
+  } else {
+    creating = chrome.offscreen.createDocument({
+      url: path,
+      reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Playing TTS audio in the background'
+    });
+    await creating;
+    creating = null;
+  }
 }
 
 // Set up context menu items
@@ -34,12 +42,12 @@ function setupContextMenu() {
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "readAloud") {
-    let text = info.selectionText || "";
-    
+    let text = info.selectionText;
+
     if (!text) {
       // If no text is selected, get the page content
       chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tab?.id },
         function: () => {
           return document.body.innerText;
         }
@@ -66,7 +74,7 @@ async function processAndReadText(text, tabId) {
       recordAudio: false,
       preprocessText: true
     });
-    
+
     // Process text if enabled
     if (settings.preprocessText && tabId) {
       try {
@@ -75,17 +83,17 @@ async function processAndReadText(text, tabId) {
           target: { tabId: tabId },
           files: ['textProcessor.js']
         });
-        
+
         // Process the text
         const result = await chrome.scripting.executeScript({
           target: { tabId: tabId },
           func: (textToProcess) => {
-            return window.TextProcessor.process(textToProcess);
+            return TextProcessor.process(textToProcess);
           },
           args: [text]
         });
-        
-        if (result && result[0] && result[0].result) {
+
+        if (result?.[0]?.result) {
           text = result[0].result;
         }
       } catch (error) {
@@ -93,91 +101,91 @@ async function processAndReadText(text, tabId) {
         // Fall back to using the original text
       }
     }
-    
+
     // Set state to loading
     currentPlayerState = 'loading';
-    chrome.runtime.sendMessage({ 
-      type: 'playerStateUpdate', 
-      state: 'loading' 
+    chrome.runtime.sendMessage({
+      type: 'playerStateUpdate',
+      state: 'loading'
     });
-    
+
     // Start streaming audio
     startStreamingAudio(text, settings);
   } catch (error) {
     console.error('Error in processAndReadText:', error);
-    chrome.runtime.sendMessage({ 
-      type: 'streamError', 
-      error: error.message 
+    chrome.runtime.sendMessage({
+      type: 'streamError',
+      error: error.message
     });
   }
 }
 
 // Handle messages from popup or offscreen document
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   switch (message.type) {
     case 'setupOffscreen':
       setupOffscreenDocument().then(() => sendResponse({ success: true }));
       return true;
-      
+
     case 'startStreaming':
       isRecording = message.record;
       // Set state to loading before starting the audio stream
       currentPlayerState = 'loading';
-      chrome.runtime.sendMessage({ 
-        type: 'playerStateUpdate', 
-        state: 'loading' 
+      chrome.runtime.sendMessage({
+        type: 'playerStateUpdate',
+        state: 'loading'
       });
       startStreamingAudio(message.text, message.settings);
       sendResponse({ success: true });
       return true;
-      
+
     case 'controlAudio':
-      chrome.runtime.sendMessage({ 
-        type: message.action, 
-        data: message.data 
+      chrome.runtime.sendMessage({
+        type: message.action,
+        data: message.data
       });
       return true;
-      
+
     case 'stateUpdate':
       currentPlayerState = message.state;
-      chrome.runtime.sendMessage({ 
-        type: 'playerStateUpdate', 
-        state: message.state 
+      chrome.runtime.sendMessage({
+        type: 'playerStateUpdate',
+        state: message.state
       });
       return true;
-      
+
     case 'audioReady':
       // Audio is ready but not yet playing
       if (currentPlayerState === 'loading') {
         currentPlayerState = 'ready';
-        chrome.runtime.sendMessage({ 
-          type: 'playerStateUpdate', 
-          state: 'ready' 
+        chrome.runtime.sendMessage({
+          type: 'playerStateUpdate',
+          state: 'ready'
         });
       }
       return true;
-      
+
     case 'getPlayerState':
       sendResponse({ state: currentPlayerState });
       return true;
-      
+
     case 'seek':
-      chrome.runtime.sendMessage({ 
-        type: 'seek', 
-        time: message.time 
+      chrome.runtime.sendMessage({
+        type: 'seek',
+        time: message.time
       }, (response) => {
         sendResponse(response);
       });
       return true;
-      
+
     case 'getTimeInfo':
-      chrome.runtime.sendMessage({ 
-        type: 'getTimeInfo' 
-      }, (response) => {
+      chrome.runtime.sendMessage({
+        type: 'getTimeInfo'
+      }).then((response) => {
         sendResponse(response);
       });
       return true;
-      
+
     case 'timeUpdate':
       // Forward time updates to the popup
       chrome.runtime.sendMessage(message);
@@ -189,7 +197,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 async function startStreamingAudio(text, settings) {
   try {
     await setupOffscreenDocument();
-    
+
     const response = await fetch(settings.serverUrl, {
       method: 'POST',
       headers: {
@@ -200,7 +208,7 @@ async function startStreamingAudio(text, settings) {
         model: 'tts-1',
         voice: settings.voice,
         input: text,
-        speed: parseFloat(settings.speed)
+        speed: Number.parseFloat(settings.speed)
       })
     });
 
@@ -211,29 +219,29 @@ async function startStreamingAudio(text, settings) {
     // Get the audio data as a blob
     const audioBlob = await response.blob();
     const mimeType = audioBlob.type || 'audio/mpeg';
-    
+
     // Convert blob to array buffer to send to offscreen document
     const arrayBuffer = await audioBlob.arrayBuffer();
-    
+
     // Send the audio data to the offscreen document
-    chrome.runtime.sendMessage({ 
-      type: 'processAudioData', 
+    chrome.runtime.sendMessage({
+      type: 'processAudioData',
       audioData: Array.from(new Uint8Array(arrayBuffer)),
       mimeType: mimeType,
       isRecording: isRecording
     });
   } catch (error) {
     console.error('Error streaming audio:', error);
-    chrome.runtime.sendMessage({ 
-      type: 'streamError', 
-      error: error.message 
+    chrome.runtime.sendMessage({
+      type: 'streamError',
+      error: error.message
     });
-    
+
     // Update state to stopped on error
     currentPlayerState = 'stopped';
-    chrome.runtime.sendMessage({ 
-      type: 'playerStateUpdate', 
-      state: 'stopped' 
+    chrome.runtime.sendMessage({
+      type: 'playerStateUpdate',
+      state: 'stopped'
     });
   }
 }

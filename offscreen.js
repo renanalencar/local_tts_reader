@@ -107,22 +107,26 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 });
 
-// Initialize when the document loads
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('Offscreen document loaded');
+// Initialize audio event handlers
+audioElement.onplay = () => {
+  chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'playing' });
+};
 
-  // Initialize audio event handlers
-  audioElement.onplay = () => {
-    chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'playing' });
-  };
+audioElement.onpause = () => {
+  chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'paused' });
+};
 
-  audioElement.onpause = () => {
-    chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'paused' });
-  };
+audioElement.onended = () => {
+  chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'stopped' });
+};
 
-  audioElement.onended = () => {
-    chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'stopped' });
-  };
-
-  console.log('Offscreen document initialized');
-});
+// Add timeupdate event for seeking
+audioElement.ontimeupdate = () => {
+  chrome.runtime.sendMessage({
+    type: 'timeUpdate',
+    timeInfo: {
+      currentTime: audioElement?.currentTime ?? 0,
+      duration: audioElement?.duration ?? 0
+    }
+  });
+};

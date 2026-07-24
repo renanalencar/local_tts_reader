@@ -67,12 +67,34 @@ function setupContextMenu() {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "readAloud") {
     let text = info.selectionText;
+    let frameId = info.frameId || 0;
 
     if (!text) {
-      // If no text is selected, get the page content
+      // If no text is selected, read from the clicked element onwards
       chrome.scripting.executeScript({
-        target: { tabId: tab?.id },
+        target: { tabId: tab?.id, frameIds: [frameId] },
         function: () => {
+          const startNode = window.ttsLastRightClickedElement;
+          if (startNode) {
+            try {
+              const range = document.createRange();
+              range.setStartBefore(startNode);
+              const lastChild = document.body.lastChild || document.body;
+              range.setEndAfter(lastChild);
+              
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              const extractedText = selection.toString();
+              selection.removeAllRanges();
+              
+              if (extractedText && extractedText.trim()) {
+                return extractedText;
+              }
+            } catch (e) {
+              console.error('Error extracting text from clicked element', e);
+            }
+          }
           return document.body.innerText;
         }
       }).then(results => {
@@ -459,6 +481,18 @@ function splitText(text) {
 // Initialize context menu when extension is installed or updated
 chrome.runtime.onInstalled.addListener(() => {
   setupContextMenu();
+  
+  // Inject content script into all existing tabs so it works without reloading
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://') && !tab.url.startsWith('about:')) {
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['content.js']
+        }).catch(() => {});
+      }
+    }
+  });
 });
 
 async function highlightChunkInTab(chunkText, isStopped = false) {

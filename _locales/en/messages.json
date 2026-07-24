@@ -4,7 +4,7 @@
     "description": "Name of the extension"
   },
   "extDesc": {
-    "message": "Reads webpage content using local Text-to-Speech service",
+    "message": "Reads webpage content using local Text-to-Speech service.",
     "description": "Description of the extension"
   },
   "settingsTitle": {

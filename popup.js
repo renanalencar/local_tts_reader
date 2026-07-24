@@ -162,13 +162,7 @@ function startSeekBarUpdates() {
   return updateInterval;
 }
 
-// Process text based on settings
-function processText(text, settings) {
-  if (settings.preprocessText) {
-    return TextProcessor.process(text);
-  }
-  return text;
-}
+
 
 document.addEventListener('DOMContentLoaded', async function() {
   // Localize UI
@@ -265,9 +259,6 @@ document.addEventListener('DOMContentLoaded', async function() {
           });
 
           let text = result[0].result;
-          
-          // Process text if enabled
-          text = processText(text, cachedSettings);
           
           updateControlButtons('loading');
           await audioPlayer.play(text, cachedSettings, tab.id);

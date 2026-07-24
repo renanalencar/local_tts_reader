@@ -99,33 +99,6 @@ async function processAndReadText(text, tabId) {
       preprocessText: true
     });
 
-    // Process text if enabled
-    if (settings.preprocessText && tabId) {
-      try {
-        // Inject the text processor script if needed
-        await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          files: ['textProcessor.js']
-        });
-
-        // Process the text
-        const result = await chrome.scripting.executeScript({
-          target: { tabId: tabId },
-          func: (textToProcess) => {
-            return TextProcessor.process(textToProcess);
-          },
-          args: [text]
-        });
-
-        if (result?.[0]?.result) {
-          text = result[0].result;
-        }
-      } catch (error) {
-        console.error('Error processing text:', error);
-        // Fall back to using the original text
-      }
-    }
-
     // Set state to loading
     currentPlayerState = 'loading';
     chrome.runtime.sendMessage({
@@ -354,6 +327,11 @@ async function fetchNextChunk() {
     
     while (retries > 0) {
       try {
+        let processedChunk = chunk;
+        if (streamingSettings.preprocessText) {
+          processedChunk = TextProcessor.process(chunk);
+        }
+
         response = await fetch(streamingSettings.serverUrl, {
           method: 'POST',
           headers: {
@@ -363,7 +341,7 @@ async function fetchNextChunk() {
           body: JSON.stringify({
             model: 'tts-1',
             voice: streamingSettings.voice,
-            input: chunk,
+            input: processedChunk,
             speed: Number.parseFloat(streamingSettings.speed)
           }),
           signal: signal

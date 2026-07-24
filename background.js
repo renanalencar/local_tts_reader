@@ -275,6 +275,11 @@ async function startStreamingAudio(text, settings, tabId) {
   try {
     await setupOffscreenDocument();
     
+    // Stop any currently playing audio immediately
+    chrome.runtime.sendMessage({
+      type: 'stop'
+    }).catch(() => {});
+    
     // Clear previous highlight
     highlightChunkInTab(null, true);
 

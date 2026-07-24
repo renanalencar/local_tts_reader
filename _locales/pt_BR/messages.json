@@ -4,7 +4,7 @@
     "description": "Name of the extension"
   },
   "extDesc": {
-    "message": "Lê o conteúdo da página da web usando serviço local de Texto para Fala",
+    "message": "Lê o conteúdo da página da web usando serviço local de texto para fala.",
     "description": "Description of the extension"
   },
   "settingsTitle": {

@@ -208,36 +208,39 @@ body {
 }
 
 /* Inputs */
-.select-wrapper {
-  position: relative;
-}
-
 select,
 input[type="text"] {
   appearance: none;
   background-color: var(--input-bg);
   border: 1px solid var(--border-color);
   color: var(--text-main);
-  padding: 6px 28px 6px 12px;
-  border-radius: 6px;
+  padding: 8px 28px 8px 12px;
+  border-radius: 8px;
   font-size: 13px;
+  font-family: inherit;
   outline: none;
-  cursor: pointer;
-  min-width: 120px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
 }
 
 select {
-  text-align: left;
+  cursor: pointer;
+}
+
+.select-wrapper {
+  position: relative;
+  width: 200px;
 }
 
 input[type="text"] {
   padding: 8px 12px;
-  width: 100%;
   cursor: text;
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus,
+select:focus {
   border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(59, 198, 173, 0.2);
 }
 
 .select-wrapper::after {
@@ -245,7 +248,7 @@ input[type="text"]:focus {
   font-size: 8px;
   color: var(--text-muted);
   position: absolute;
-  right: 10px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   pointer-events: none;

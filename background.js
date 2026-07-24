@@ -66,46 +66,67 @@ function setupContextMenu() {
 // Handle context menu clicks
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "readAloud") {
-    let text = info.selectionText;
     let frameId = info.frameId || 0;
 
-    if (!text) {
-      // If no text is selected, read from the clicked element onwards
-      chrome.scripting.executeScript({
-        target: { tabId: tab?.id, frameIds: [frameId] },
-        function: () => {
-          const startNode = window.ttsLastRightClickedElement;
-          if (startNode) {
-            try {
-              const range = document.createRange();
-              range.setStartBefore(startNode);
-              const lastChild = document.body.lastChild || document.body;
-              range.setEndAfter(lastChild);
-              
-              const selection = window.getSelection();
-              selection.removeAllRanges();
-              selection.addRange(range);
-              const extractedText = selection.toString();
-              selection.removeAllRanges();
-              
-              if (extractedText && extractedText.trim()) {
-                return extractedText;
-              }
-            } catch (e) {
-              console.error('Error extracting text from clicked element', e);
+    chrome.scripting.executeScript({
+      target: { tabId: tab?.id, frameIds: [frameId] },
+      function: () => {
+        const selection = window.getSelection();
+        const isSelection = selection && selection.rangeCount > 0 && !selection.isCollapsed;
+        let startNode = isSelection ? selection.getRangeAt(0).startContainer : window.ttsLastRightClickedElement;
+
+        if (startNode && document.body.contains(startNode) && startNode !== document.body && startNode !== document.documentElement) {
+          try {
+            const treeWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+                acceptNode: (n) => {
+                    const parent = n.parentNode;
+                    if (!parent) return NodeFilter.FILTER_REJECT;
+                    const tag = parent.nodeName;
+                    if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+
+            let fullText = "";
+            let extractedText = "";
+            let n;
+            let foundStart = false;
+            
+            while (n = treeWalker.nextNode()) {
+                if (!foundStart) {
+                    // Check if this text node is inside the clicked element or follows it
+                    if (n === startNode || startNode.contains(n) || (startNode.compareDocumentPosition(n) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+                        foundStart = true;
+                        window.ttsStartingIndex = fullText.replace(/\s+/g, '').length;
+                        if (isSelection) break; // For selections, we only need the index
+                    }
+                }
+                
+                fullText += n.textContent;
+                
+                if (foundStart && !isSelection) {
+                    extractedText += n.textContent + " ";
+                }
             }
+
+            if (!isSelection && extractedText.trim()) {
+              return extractedText.trim();
+            }
+          } catch (e) {
+            console.error('Error extracting text via TreeWalker', e);
           }
-          return document.body.innerText;
         }
-      }).then(results => {
+        
+        if (isSelection) {
+            return selection.toString().trim();
+        }
+        return document.body.innerText;
+      }
+    }).then(results => {
         if (results && results[0] && results[0].result) {
           processAndReadText(results[0].result, tab.id);
         }
-      });
-    } else {
-      // Use the selected text
-      processAndReadText(text, tab.id);
-    }
+    });
   }
 });
 
@@ -532,7 +553,9 @@ async function highlightChunkInTab(chunkText, isStopped = false) {
         });
 
         if (isStopped || !text) {
-          window.ttsLastFoundIndex = 0;
+          window.ttsLastFoundIndex = window.ttsStartingIndex || 0;
+          // Clear it after using, so normal "read page" starts from 0 again
+          window.ttsStartingIndex = 0;
           return;
         }
 

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title data-i18n="settingsTitle">LocalReader Settings</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      width: 100%;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 32px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header" style="justify-content: center; margin-bottom: 32px;">
+    <img src="coding.png" class="header-icon" alt="LocalReader" style="width: 32px; height: 32px;">
+    <div class="header-title" style="font-size: 24px; flex-grow: 0; margin-right: 12px;">LocalReader Settings</div>
+    <div class="version-badge">v1.0.0</div>
+  </div>
+
+  <div class="settings-panel">
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optVoice">Voice</div>
+      <div class="select-wrapper">
+        <select id="voice">
+          <option value="am_adam">Adam (Alloy)</option>
+          <option value="af_nicole">Nicole (Ash)</option>
+          <option value="bf_emma">Emma (Coral)</option>
+          <option value="af_bella">Bella (Echo)</option>
+          <option value="af_sarah">Sarah (Fable)</option>
+          <option value="bm_george">George (Onyx)</option>
+          <option value="bf_isabella">Isabella (Nova)</option>
+          <option value="am_michael">Michael (Sage)</option>
+          <option value="af_sky">Sky (Shimmer)</option>
+          <option value="pf_dora">Doralice (Dora)</option>
+          <option value="pm_alex">Alexandre (Alex)</option>
+          <option value="pm_santa">Papai Noel (Santa)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label"><span data-i18n="optSpeed">Speed</span> <span class="sub" id="speedValue">1.0x</span>
+      </div>
+      <div class="range-wrapper" style="width: 200px;">
+        <input type="range" id="speed" min="0.25" max="4.0" step="0.25" value="1.0">
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label"><span data-i18n="optMaxReadLengthBr">Max Read<br>Length</span> <span class="sub"
+          id="maxLengthValue">350</span></div>
+      <div class="range-wrapper" style="width: 200px;">
+        <input type="range" id="maxReadLength" min="50" max="1000" step="10" value="350">
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optClickToRead">Click To Read</div>
+      <label class="toggle">
+        <input type="checkbox" id="clickToRead" checked>
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optAutoScroll">Auto-Scroll</div>
+      <label class="toggle">
+        <input type="checkbox" id="autoScroll" checked>
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optHighlightColor">Highlight Color</div>
+      <input type="color" id="highlightColor" class="color-picker" value="#CFFF04">
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optSaveAudio">Save Audio</div>
+      <label class="toggle">
+        <input type="checkbox" id="recordAudio">
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label" data-i18n="optPreProcess">Pre-process</div>
+      <label class="toggle">
+        <input type="checkbox" id="preprocessText" checked>
+        <span class="slider-toggle"></span>
+      </label>
+    </div>
+
+    <div class="setting-row column-layout">
+      <div class="setting-label" data-i18n="optServerUrl">Server URL</div>
+      <input type="text" id="serverUrl" value="http://localhost:8880/v1/audio/speech">
+    </div>
+  </div>
+
+  <script src="constants.js"></script>
+  <script src="options.js"></script>
+</body>
+
+</html>

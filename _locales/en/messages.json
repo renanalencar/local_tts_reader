@@ -1,0 +1,118 @@
+{
+  "extName": {
+    "message": "Local TTS Reader",
+    "description": "Name of the extension"
+  },
+  "extDesc": {
+    "message": "Reads webpage content using local Text-to-Speech service",
+    "description": "Description of the extension"
+  },
+  "settingsTitle": {
+    "message": "LocalReader Settings",
+    "description": "Title of the settings page"
+  },
+  "btnSettingsTitle": {
+    "message": "Settings",
+    "description": "Tooltip for Settings button"
+  },
+  "btnPlayTitle": {
+    "message": "Play",
+    "description": "Tooltip for Play button"
+  },
+  "btnPauseTitle": {
+    "message": "Pause",
+    "description": "Tooltip for Pause button"
+  },
+  "btnStopTitle": {
+    "message": "Stop",
+    "description": "Tooltip for Stop button"
+  },
+  "btnDownloadTitle": {
+    "message": "Download",
+    "description": "Tooltip for Download button"
+  },
+  "readBtn": {
+    "message": "READ",
+    "description": "Text for READ button"
+  },
+  "pausedStatus": {
+    "message": "PAUSED",
+    "description": "Text for PAUSED status"
+  },
+  "audioDownloaded": {
+    "message": "Audio downloaded",
+    "description": "Success message when audio downloaded"
+  },
+  "errorOccurred": {
+    "message": "An error occurred",
+    "description": "Generic error message"
+  },
+  "streamErrorOccurred": {
+    "message": "Stream error occurred",
+    "description": "Stream error message"
+  },
+  "shortcutClickTitle": {
+    "message": "Click",
+    "description": "Click shortcut text"
+  },
+  "shortcutClickDesc": {
+    "message": "Read from here",
+    "description": "Click shortcut description"
+  },
+  "shortcutPlayPauseDesc": {
+    "message": "Play / Pause",
+    "description": "Play pause description"
+  },
+  "shortcutStopDesc": {
+    "message": "Stop",
+    "description": "Stop description"
+  },
+  "shortcutNavDesc": {
+    "message": "Nav",
+    "description": "Nav description"
+  },
+  "optVoice": {
+    "message": "Voice",
+    "description": "Voice setting label"
+  },
+  "optSpeed": {
+    "message": "Speed",
+    "description": "Speed setting label"
+  },
+  "optMaxReadLength": {
+    "message": "Max Read Length",
+    "description": "Max read length setting label"
+  },
+  "optMaxReadLengthBr": {
+    "message": "Max Read<br>Length",
+    "description": "Max read length setting label with break"
+  },
+  "optClickToRead": {
+    "message": "Click To Read",
+    "description": "Click to read setting label"
+  },
+  "optAutoScroll": {
+    "message": "Auto-Scroll",
+    "description": "Auto scroll setting label"
+  },
+  "optHighlightColor": {
+    "message": "Highlight Color",
+    "description": "Highlight color setting label"
+  },
+  "optSaveAudio": {
+    "message": "Save Audio",
+    "description": "Save audio setting label"
+  },
+  "optPreProcess": {
+    "message": "Pre-process",
+    "description": "Pre-process setting label"
+  },
+  "optServerUrl": {
+    "message": "Server URL",
+    "description": "Server URL setting label"
+  },
+  "contextMenuReadAloud": {
+    "message": "Read Aloud",
+    "description": "Context menu title"
+  }
+}

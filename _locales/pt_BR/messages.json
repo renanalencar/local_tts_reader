@@ -1,0 +1,118 @@
+{
+  "extName": {
+    "message": "Local TTS Reader",
+    "description": "Name of the extension"
+  },
+  "extDesc": {
+    "message": "Lê o conteúdo da página da web usando serviço local de Texto para Fala",
+    "description": "Description of the extension"
+  },
+  "settingsTitle": {
+    "message": "Configurações LocalReader",
+    "description": "Title of the settings page"
+  },
+  "btnSettingsTitle": {
+    "message": "Configurações",
+    "description": "Tooltip for Settings button"
+  },
+  "btnPlayTitle": {
+    "message": "Reproduzir",
+    "description": "Tooltip for Play button"
+  },
+  "btnPauseTitle": {
+    "message": "Pausar",
+    "description": "Tooltip for Pause button"
+  },
+  "btnStopTitle": {
+    "message": "Parar",
+    "description": "Tooltip for Stop button"
+  },
+  "btnDownloadTitle": {
+    "message": "Baixar",
+    "description": "Tooltip for Download button"
+  },
+  "readBtn": {
+    "message": "LER",
+    "description": "Text for READ button"
+  },
+  "pausedStatus": {
+    "message": "PAUSADO",
+    "description": "Text for PAUSED status"
+  },
+  "audioDownloaded": {
+    "message": "Áudio baixado",
+    "description": "Success message when audio downloaded"
+  },
+  "errorOccurred": {
+    "message": "Ocorreu um erro",
+    "description": "Generic error message"
+  },
+  "streamErrorOccurred": {
+    "message": "Ocorreu um erro no stream",
+    "description": "Stream error message"
+  },
+  "shortcutClickTitle": {
+    "message": "Clique",
+    "description": "Click shortcut text"
+  },
+  "shortcutClickDesc": {
+    "message": "Ler daqui",
+    "description": "Click shortcut description"
+  },
+  "shortcutPlayPauseDesc": {
+    "message": "Reproduzir/Pausar",
+    "description": "Play pause description"
+  },
+  "shortcutStopDesc": {
+    "message": "Parar",
+    "description": "Stop description"
+  },
+  "shortcutNavDesc": {
+    "message": "Nav",
+    "description": "Nav description"
+  },
+  "optVoice": {
+    "message": "Voz",
+    "description": "Voice setting label"
+  },
+  "optSpeed": {
+    "message": "Velocidade",
+    "description": "Speed setting label"
+  },
+  "optMaxReadLength": {
+    "message": "Tamanho Máx. Leitura",
+    "description": "Max read length setting label"
+  },
+  "optMaxReadLengthBr": {
+    "message": "Tamanho Máx.<br>Leitura",
+    "description": "Max read length setting label with break"
+  },
+  "optClickToRead": {
+    "message": "Clique para Ler",
+    "description": "Click to read setting label"
+  },
+  "optAutoScroll": {
+    "message": "Rolagem Auto",
+    "description": "Auto scroll setting label"
+  },
+  "optHighlightColor": {
+    "message": "Cor de Destaque",
+    "description": "Highlight color setting label"
+  },
+  "optSaveAudio": {
+    "message": "Salvar Áudio",
+    "description": "Save audio setting label"
+  },
+  "optPreProcess": {
+    "message": "Pré-processar",
+    "description": "Pre-process setting label"
+  },
+  "optServerUrl": {
+    "message": "URL do Servidor",
+    "description": "Server URL setting label"
+  },
+  "contextMenuReadAloud": {
+    "message": "Ler em Voz Alta",
+    "description": "Context menu title"
+  }
+}

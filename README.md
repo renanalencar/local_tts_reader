@@ -6,11 +6,13 @@ A sleek Chrome extension that converts webpage text to speech using a local Open
 ## Features
 
 - 🎯 Read selected text or entire webpage
+- 🖍️ Live text highlighting while reading
 - 🎭 Multiple voice options compatible with OpenAI voice mappings
 - ⚡ Adjustable playback speed (0.25x to 4.0x)
 - 💾 Option to save audio for download
 - ⏯️ Play/Pause/Stop/Seek controls
-- 🎨 Clean, modern interface
+- 🎨 Clean, modern interface with Light and Dark mode support
+- 🌍 Internationalization (i18n) support (English and Brazilian Portuguese)
 - 🔧 Configurable server URL
 - 🌐 Works with Tailscale/local network TTS servers
 
@@ -55,6 +57,9 @@ The extension supports the following voices:
 - Isabella (Nova) - `bf_isabella`
 - Michael (Sage) - `am_michael`
 - Sky (Shimmer) - `af_sky`
+- Doralice (Dora) - `pf_dora`
+- Alexandre (Alex) - `pm_alex`
+- Papai Noel (Santa) - `pm_santa`
 
 ## Server Requirements
 
@@ -76,10 +81,14 @@ Default server URL: `http://localhost:8000/v1/audio/speech`
 
 ## Development
 
-The extension consists of three main files:
+The extension uses a modern architecture with a service worker and offscreen document for reliable audio playback:
 - `manifest.json`: Extension configuration
-- `popup.html`: UI layout and styles
-- `popup.js`: Core functionality and event handlers
+- `popup.html` & `popup.js`: UI layout and popup functionality
+- `options.html` & `options.js`: Extension settings page
+- `background.js`: Service worker for text extraction and state management
+- `offscreen.html`, `offscreen.js`, & `audioPlayer.js`: Reliable audio playback engine
+- `textProcessor.js`: Text chunking and sentence boundary detection
+- `_locales/`: Localization files for internationalization (i18n)
 
 To modify the extension:
 1. Make your changes

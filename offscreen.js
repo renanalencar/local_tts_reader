@@ -1,18 +1,25 @@
 const audioElement = document.getElementById('audioElement');
+let audioQueue = [];
+let isPlayingQueue = false;
+
+// Create a silent audio element to keep the offscreen document alive indefinitely
+const silentAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+silentAudio.loop = true;
+silentAudio.volume = 0;
+silentAudio.play().catch(e => console.warn('Could not play silent audio:', e));
 
 // Process audio data received from background script
-function processAudioData(audioDataArray, mimeType, isRecording) {
+async function processAudioData(base64Audio, mimeType, isRecording, forDownloadOnly = false, chunkText = null) {
   try {
-    // Convert array back to Uint8Array
-    const uint8Array = new Uint8Array(audioDataArray);
-
-    // Create blob from the array
-    const blob = new Blob([uint8Array], { type: mimeType });
+    // Native, highly optimized async conversion from base64 to Blob
+    const dataUrl = `data:${mimeType};base64,${base64Audio}`;
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
 
     // Create URL for the blob
     const audioUrl = URL.createObjectURL(blob);
 
-    // If recording is enabled, send URL back for download
+    // If recording is enabled or this is the final merged file, send URL back for download
     if (isRecording) {
       chrome.runtime.sendMessage({
         type: 'recordingComplete',
@@ -20,11 +27,21 @@ function processAudioData(audioDataArray, mimeType, isRecording) {
       });
     }
 
-    // Play the audio
-    playAudioUrl(audioUrl);
+    if (forDownloadOnly) {
+      return; // Do not play this one
+    }
+
+    // Queue for playback
+    audioQueue.push({ url: audioUrl, text: chunkText });
+    if (!isPlayingQueue) {
+      playNextInQueue();
+    }
 
     // Notify that audio is ready to play
     chrome.runtime.sendMessage({ type: 'audioReady' });
+    
+    // Check if we need more chunks to buffer
+    checkQueueAndRequestNext();
   } catch (error) {
     console.error('Error processing audio data:', error);
     chrome.runtime.sendMessage({
@@ -32,6 +49,29 @@ function processAudioData(audioDataArray, mimeType, isRecording) {
       error: error.message
     });
   }
+}
+
+function checkQueueAndRequestNext() {
+  if (audioQueue.length < 2) {
+    chrome.runtime.sendMessage({ type: 'requestNextChunk' });
+  }
+}
+
+function playNextInQueue() {
+  if (audioQueue.length === 0) {
+    isPlayingQueue = false;
+    chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'stopped' });
+    return;
+  }
+  
+  isPlayingQueue = true;
+  const item = audioQueue.shift();
+  
+  if (item.text) {
+    chrome.runtime.sendMessage({ type: 'chunkPlaying', text: item.text });
+  }
+  
+  playAudioUrl(item.url);
 }
 
 // Play audio from URL
@@ -79,9 +119,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   switch (message.type) {
     case 'processAudioData':
       if (message.audioData) {
-        processAudioData(message.audioData, message.mimeType, message.isRecording);
+        processAudioData(message.audioData, message.mimeType, message.isRecording, message.forDownloadOnly, message.chunkText);
       }
-      break;
+      sendResponse({ success: true });
+      return true;
 
     case 'play':
       audioElement.play();
@@ -92,9 +133,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       break;
 
     case 'stop':
+      audioQueue = []; // Clear the queue
+      isPlayingQueue = false;
       audioElement.pause();
       audioElement.currentTime = 0;
       chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'stopped' });
+      break;
+
+    case 'playUrl':
+      audioQueue = [];
+      isPlayingQueue = false;
+      audioElement.src = message.data.url;
+      audioElement.play().catch(console.error);
+      chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'playing' });
       break;
 
     case 'seek': {
@@ -113,11 +164,18 @@ audioElement.onplay = () => {
 };
 
 audioElement.onpause = () => {
-  chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'paused' });
+  // Only send pause state if we aren't about to play the next chunk
+  if (audioQueue.length === 0 || !isPlayingQueue) {
+    chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'paused' });
+  }
 };
 
 audioElement.onended = () => {
-  chrome.runtime.sendMessage({ type: 'stateUpdate', state: 'stopped' });
+  // Play the next chunk in the queue
+  playNextInQueue();
+  
+  // Check if we need more chunks to buffer
+  checkQueueAndRequestNext();
 };
 
 // Add timeupdate event for seeking
@@ -130,3 +188,8 @@ audioElement.ontimeupdate = () => {
     }
   });
 };
+
+// Keep the service worker alive during long fetches
+setInterval(() => {
+  chrome.runtime.sendMessage({ type: 'keepAlive' }).catch(() => {});
+}, 10000);

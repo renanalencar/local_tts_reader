@@ -56,7 +56,63 @@ class TextProcessor {
     
     return processedText;
   }
-  
+
+  /**
+   * Split text into chunks of maximum length for sequential TTS generation
+   * @param {string} text - The text to chunk
+   * @param {number|string} maxLength - Maximum length per chunk
+   * @returns {string[]} - Array of text chunks
+   */
+  static chunkText(text, maxLength = 350) {
+    if (!text) return [];
+    
+    // Ensure maxLength is a valid number
+    const maxLen = Number(maxLength) || 350;
+    
+    const chunks = [];
+    let currentChunk = '';
+    
+    // Split by regex that splits cleanly on sentences while keeping the punctuation.
+    // (?<=[.!?])\s+ is a positive lookbehind that splits on whitespace following punctuation.
+    let sentences;
+    try {
+      sentences = text.split(/(?<=[.!?])\s+/);
+    } catch (e) {
+      // Fallback for browsers that don't support lookbehind
+      sentences = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
+    }
+    
+    for (const sentence of sentences) {
+      const cleanSentence = sentence.trim();
+      if (!cleanSentence) continue;
+
+      if (currentChunk.length + cleanSentence.length + 1 > maxLen && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = '';
+      }
+      
+      // If a single sentence is longer than maxLen, split it by words
+      if (cleanSentence.length > maxLen) {
+        const words = cleanSentence.split(/\s+/);
+        for (const word of words) {
+          if (currentChunk.length + word.length + 1 > maxLen && currentChunk.length > 0) {
+            chunks.push(currentChunk.trim());
+            currentChunk = '';
+          }
+          currentChunk += (currentChunk ? ' ' : '') + word;
+        }
+      } else {
+        currentChunk += (currentChunk ? ' ' : '') + cleanSentence;
+      }
+    }
+    
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks;
+  }
+
   /**
    * Process URLs in text
    * @param {string} text - The text containing URLs
@@ -98,4 +154,8 @@ class TextProcessor {
 }
 
 // Make available globally
-window.TextProcessor = TextProcessor;
+if (typeof window !== 'undefined') {
+  window.TextProcessor = TextProcessor;
+} else if (typeof self !== 'undefined') {
+  self.TextProcessor = TextProcessor;
+}

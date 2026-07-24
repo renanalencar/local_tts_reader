@@ -12,7 +12,7 @@ class AudioPlayer {
       }
     }
   
-    async play(text, settings) {
+    async play(text, settings, tabId = null) {
       await this.init();
       
       try {
@@ -21,7 +21,8 @@ class AudioPlayer {
           type: 'startStreaming', 
           text: text, 
           settings: settings,
-          record: settings.recordAudio
+          record: settings.recordAudio,
+          tabId: tabId
         });
         
         this.isPlaying = true;

@@ -1,11 +1,40 @@
 let audioPlayer = null;
 let currentAudioUrl = null;
+let isGenerating = false;
+let cachedSettings = { ...DEFAULT_SETTINGS };
+
+chrome.storage.local.get(DEFAULT_SETTINGS, (result) => {
+  cachedSettings = result;
+});
+
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local') {
+    for (let [key, { newValue }] of Object.entries(changes)) {
+      cachedSettings[key] = newValue !== undefined ? newValue : DEFAULT_SETTINGS[key];
+    }
+    syncPlayerState();
+  }
+});
 
 function updateStatus(message, isError = false) {
-  const status = document.getElementById('status');
-  status.textContent = message;
-  status.className = `visible ${isError ? 'error' : 'success'}`;
-  setTimeout(() => status.className = '', 3000);
+  const statusBtn = document.getElementById('statusBtn');
+  if (statusBtn) {
+    statusBtn.innerHTML = message;
+    if (isError) {
+      statusBtn.classList.add('error');
+    } else {
+      statusBtn.classList.remove('error');
+    }
+  }
+}
+
+function showAudioWave() {
+  return `
+    <div class="audio-wave">
+      <div></div><div></div><div></div><div></div>
+      <div></div><div></div><div></div>
+    </div>
+  `;
 }
 
 function updateControlButtons(state) {
@@ -16,70 +45,62 @@ function updateControlButtons(state) {
   const loadingIndicator = document.getElementById('loadingIndicator');
   const seekBar = document.getElementById('seekBar');
   
+  const statusBtn = document.getElementById('statusBtn');
+  
   // Hide loading indicator by default
-  loadingIndicator.style.display = 'none';
+  if (loadingIndicator) loadingIndicator.style.display = 'none';
   
   // Stop button is always enabled (except during loading)
-  stopBtn.disabled = state === 'loading';
+  if (stopBtn) stopBtn.disabled = state === 'loading';
   
-  switch(state) {
-    case 'loading':
-      playBtn.disabled = true;
-      pauseBtn.disabled = true;
-      downloadBtn.disabled = true;
+  // Determine if download button should be enabled
+  const isRecordEnabled = cachedSettings.recordAudio;
+  const canDownload = currentAudioUrl && isRecordEnabled;
+
+  if (state === 'loading') {
+    if (playBtn) playBtn.disabled = true;
+    if (pauseBtn) pauseBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
+    if (seekBar) seekBar.disabled = true;
+    if (loadingIndicator) loadingIndicator.style.display = 'flex';
+    if (statusBtn) statusBtn.innerHTML = showAudioWave();
+  } else if (state === 'ready') {
+    if (playBtn) playBtn.disabled = false;
+    if (pauseBtn) pauseBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = !canDownload;
+    if (seekBar) seekBar.disabled = false;
+  } else if (state === 'playing') {
+    if (playBtn) playBtn.disabled = true;
+    if (pauseBtn) pauseBtn.disabled = false;
+    if (downloadBtn) downloadBtn.disabled = !canDownload;
+    if (seekBar) seekBar.disabled = false;
+    if (statusBtn) statusBtn.innerHTML = showAudioWave();
+  } else if (state === 'paused') {
+    if (playBtn) playBtn.disabled = false;
+    if (pauseBtn) pauseBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = !canDownload;
+    if (seekBar) seekBar.disabled = false;
+    if (statusBtn) statusBtn.innerHTML = chrome.i18n.getMessage("pausedStatus") || 'PAUSED';
+  } else if (state === 'stopped') {
+    if (playBtn) playBtn.disabled = false;
+    if (pauseBtn) pauseBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = !canDownload;
+    if (seekBar) {
       seekBar.disabled = true;
-      loadingIndicator.style.display = 'flex';
-      break;
-    case 'ready':
-      playBtn.disabled = false;
-      pauseBtn.disabled = true;
-      downloadBtn.disabled = !currentAudioUrl;
-      seekBar.disabled = false;
-      break;
-    case 'playing':
-      playBtn.disabled = true;
-      pauseBtn.disabled = false;
-      downloadBtn.disabled = !currentAudioUrl;
-      seekBar.disabled = false;
-      break;
-    case 'paused':
-      playBtn.disabled = false;
-      pauseBtn.disabled = true;
-      downloadBtn.disabled = !currentAudioUrl;
-      seekBar.disabled = false;
-      break;
-    case 'stopped':
-      playBtn.disabled = false;
-      pauseBtn.disabled = true;
-      downloadBtn.disabled = !currentAudioUrl;
-      seekBar.disabled = true;
-      // Reset seek bar to beginning
       seekBar.value = 0;
-      document.getElementById('currentTime').textContent = '0:00';
-      document.getElementById('duration').textContent = '0:00';
-      break;
-    default:
-      playBtn.disabled = false;
-      pauseBtn.disabled = true;
-      downloadBtn.disabled = true;
-      seekBar.disabled = true;
+    }
+    const curTime = document.getElementById('currentTime');
+    const dur = document.getElementById('duration');
+    if (curTime) curTime.textContent = '0:00';
+    if (dur) dur.textContent = '0:00';
+    if (statusBtn) updateStatus(chrome.i18n.getMessage("readBtn") || 'READ', false);
+    isGenerating = false;
+  } else {
+    if (playBtn) playBtn.disabled = false;
+    if (pauseBtn) pauseBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
+    if (seekBar) seekBar.disabled = true;
   }
-}
-
-function getSettings() {
-  return {
-    serverUrl: document.getElementById('serverUrl').value,
-    voice: document.getElementById('voice').value,
-    speed: document.getElementById('speed').value,
-    recordAudio: document.getElementById('recordAudio').checked,
-    preprocessText: document.getElementById('preprocessText').checked
-  };
-}
-
-async function saveSettings() {
-  const settings = getSettings();
-  await chrome.storage.local.set(settings);
-  updateStatus('Settings saved!', false);
 }
 
 // Format time in seconds to MM:SS format
@@ -101,10 +122,14 @@ async function syncPlayerState() {
     const timeInfo = await audioPlayer.getTimeInfo();
     if (timeInfo) {
       const seekBar = document.getElementById('seekBar');
-      seekBar.max = timeInfo.duration;
-      seekBar.value = timeInfo.currentTime;
-      document.getElementById('currentTime').textContent = formatTime(timeInfo.currentTime);
-      document.getElementById('duration').textContent = formatTime(timeInfo.duration);
+      if (seekBar) {
+        seekBar.max = timeInfo.duration;
+        seekBar.value = timeInfo.currentTime;
+      }
+      const curTime = document.getElementById('currentTime');
+      const dur = document.getElementById('duration');
+      if (curTime) curTime.textContent = formatTime(timeInfo.currentTime);
+      if (dur) dur.textContent = formatTime(timeInfo.duration);
     }
   }
 }
@@ -123,12 +148,13 @@ function startSeekBarUpdates() {
     const timeInfo = await audioPlayer.getTimeInfo();
     if (timeInfo) {
       const seekBar = document.getElementById('seekBar');
-      // Only update if user is not currently dragging
-      if (!seekBar.classList.contains('seeking')) {
+      if (seekBar && !seekBar.classList.contains('seeking')) {
         seekBar.max = timeInfo.duration;
         seekBar.value = timeInfo.currentTime;
-        document.getElementById('currentTime').textContent = formatTime(timeInfo.currentTime);
-        document.getElementById('duration').textContent = formatTime(timeInfo.duration);
+        const curTime = document.getElementById('currentTime');
+        const dur = document.getElementById('duration');
+        if (curTime) curTime.textContent = formatTime(timeInfo.currentTime);
+        if (dur) dur.textContent = formatTime(timeInfo.duration);
       }
     }
   }, 1000);
@@ -145,26 +171,35 @@ function processText(text, settings) {
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
+  // Localize UI
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n'));
+    if (msg) {
+      if (el.tagName === 'TITLE' || el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'BUTTON') {
+        el.innerHTML = msg;
+      } else {
+        el.textContent = msg;
+      }
+    }
+  });
+  
+  document.querySelectorAll('[data-i18n-title]').forEach(el => {
+    const msg = chrome.i18n.getMessage(el.getAttribute('data-i18n-title'));
+    if (msg) el.title = msg;
+  });
+
   // Initialize audio player
   audioPlayer = new AudioPlayer();
   await audioPlayer.init();
   
-  // Load saved settings
-  chrome.storage.local.get({
-    serverUrl: DEFAULT_SETTINGS.serverUrl,
-    voice: DEFAULT_SETTINGS.voice,
-    speed: DEFAULT_SETTINGS.speed,
-    recordAudio: DEFAULT_SETTINGS.recordAudio,
-    preprocessText: DEFAULT_SETTINGS.preprocessText
-  }, function(result) {
-    document.getElementById('serverUrl').value = result.serverUrl;
-    document.getElementById('voice').value = result.voice;
-    document.getElementById('speed').value = result.speed;
-    document.getElementById('recordAudio').checked = result.recordAudio;
-    document.getElementById('preprocessText').checked = result.preprocessText;
-    document.querySelector('.speed-value').textContent = `${result.speed}x`;
-  });
-  
+  // Open Settings Page
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', () => {
+      chrome.runtime.openOptionsPage();
+    });
+  }
+
   // Sync player state
   syncPlayerState();
   
@@ -173,107 +208,150 @@ document.addEventListener('DOMContentLoaded', async function() {
   
   // Set up seek bar events
   const seekBar = document.getElementById('seekBar');
-  
-  // When user starts seeking
-  seekBar.addEventListener('mousedown', function() {
-    seekBar.classList.add('seeking');
-  });
-  
-  // When user is seeking
-  seekBar.addEventListener('input', function() {
-    document.getElementById('currentTime').textContent = formatTime(seekBar.value);
-  });
-  
-  // When user finishes seeking
-  seekBar.addEventListener('change', async function() {
-    const newTime = parseFloat(seekBar.value);
-    await audioPlayer.seek(newTime);
-    seekBar.classList.remove('seeking');
-  });
-  
-  // Speed slider
-  document.getElementById('speed').addEventListener('input', function(e) {
-    document.querySelector('.speed-value').textContent = `${e.target.value}x`;
-  });
-  
-  // Play button
-  document.getElementById('playBtn').addEventListener('click', async function() {
-    try {
-      const state = await audioPlayer.getState();
-      
-      if (state === 'paused' || state === 'ready') {
-        audioPlayer.resume();
-        updateControlButtons('playing');
-        
-        // Restart seek bar updates
-        if (updateInterval) clearInterval(updateInterval);
-        updateInterval = startSeekBarUpdates();
-      } else {
-        const tabs = await chrome.tabs.query({active: true, currentWindow: true});
-        const [tab] = tabs;
-        const result = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          function: () => {
-            const selection = window.getSelection();
-            return selection.toString().trim() || document.body.innerText;
-          },
-        });
+  if (seekBar) {
+    // When user starts seeking
+    seekBar.addEventListener('mousedown', function() {
+      seekBar.classList.add('seeking');
+    });
+    
+    // When user is seeking
+    seekBar.addEventListener('input', function() {
+      document.getElementById('currentTime').textContent = formatTime(seekBar.value);
+    });
+    
+    // When user finishes seeking
+    seekBar.addEventListener('change', async function() {
+      const newTime = parseFloat(seekBar.value);
+      await audioPlayer.seek(newTime);
+      seekBar.classList.remove('seeking');
+    });
+  }
 
-        let text = result[0].result;
-        const settings = getSettings();
+  // Status button (Read/Stop)
+  const statusBtn = document.getElementById('statusBtn');
+  if (statusBtn) {
+    statusBtn.addEventListener('click', async function() {
+      try {
+        const state = await audioPlayer.getState();
         
-        // Process text if enabled
-        text = processText(text, settings);
-        
-        await saveSettings();
-        updateControlButtons('loading');
-        await audioPlayer.play(text, settings);
-        
-        // Restart seek bar updates
-        if (updateInterval) clearInterval(updateInterval);
-        updateInterval = startSeekBarUpdates();
+        if (state === 'playing') {
+          audioPlayer.pause();
+          updateControlButtons('paused');
+        } else if (state === 'paused') {
+          audioPlayer.resume();
+          updateControlButtons('playing');
+          if (updateInterval) clearInterval(updateInterval);
+          updateInterval = startSeekBarUpdates();
+        } else if (state === 'loading') {
+          // Stop current loading/generation
+          isGenerating = false;
+          audioPlayer.stop();
+          updateControlButtons('stopped');
+          if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+          }
+        } else {
+          // Start reading
+          isGenerating = true;
+          const tabs = await chrome.tabs.query({active: true, currentWindow: true});
+          const [tab] = tabs;
+          const result = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            function: () => {
+              const selection = window.getSelection();
+              return selection.toString().trim() || document.body.innerText;
+            },
+          });
+
+          let text = result[0].result;
+          
+          // Process text if enabled
+          text = processText(text, cachedSettings);
+          
+          updateControlButtons('loading');
+          await audioPlayer.play(text, cachedSettings, tab.id);
+          
+          // Restart seek bar updates
+          if (updateInterval) clearInterval(updateInterval);
+          updateInterval = startSeekBarUpdates();
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        updateStatus(error.message || chrome.i18n.getMessage("errorOccurred") || 'An error occurred', true);
+        updateControlButtons('stopped');
       }
-    } catch (error) {
-      console.error('Error:', error);
-      updateStatus(error.message, true);
-      updateControlButtons('stopped');
-    }
-  });
+    });
+  }
+
+  // Play button (Resume)
+  const playBtn = document.getElementById('playBtn');
+  if (playBtn) {
+    playBtn.addEventListener('click', async function() {
+      try {
+        const state = await audioPlayer.getState();
+        
+        if (state === 'paused' || state === 'ready') {
+          audioPlayer.resume();
+          updateControlButtons('playing');
+          
+          // Restart seek bar updates
+          if (updateInterval) clearInterval(updateInterval);
+          updateInterval = startSeekBarUpdates();
+        } else if (state === 'stopped' && currentAudioUrl && !isGenerating) {
+          chrome.runtime.sendMessage({
+            type: 'controlAudio',
+            action: 'playUrl',
+            data: { url: currentAudioUrl }
+          });
+          updateControlButtons('playing');
+          if (updateInterval) clearInterval(updateInterval);
+          updateInterval = startSeekBarUpdates();
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    });
+  }
   
   // Pause button
-  document.getElementById('pauseBtn').addEventListener('click', function() {
-    audioPlayer.pause();
-    updateControlButtons('paused');
-  });
+  const pauseBtn = document.getElementById('pauseBtn');
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', function() {
+      audioPlayer.pause();
+      updateControlButtons('paused');
+    });
+  }
   
   // Stop button
-  document.getElementById('stopBtn').addEventListener('click', function() {
-    audioPlayer.stop();
-    updateControlButtons('stopped');
-    if (updateInterval) {
-      clearInterval(updateInterval);
-      updateInterval = null;
-    }
-  });
+  const stopBtn = document.getElementById('stopBtn');
+  if (stopBtn) {
+    stopBtn.addEventListener('click', function() {
+      audioPlayer.stop();
+      updateControlButtons('stopped');
+      if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
+      }
+    });
+  }
   
   // Download button
-  document.getElementById('downloadBtn').addEventListener('click', function() {
-    if (currentAudioUrl) {
-      const a = document.createElement('a');
-      a.href = currentAudioUrl;
-      a.download = 'speech.mp3';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      updateStatus('Audio downloaded', false);
-    }
-  });
-  
-  // Save settings
-  ['serverUrl', 'voice', 'speed', 'recordAudio', 'preprocessText'].forEach(id => {
-    document.getElementById(id).addEventListener('change', saveSettings);
-  });
-  
+  const downloadBtn = document.getElementById('downloadBtn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', function() {
+      if (currentAudioUrl) {
+        const a = document.createElement('a');
+        a.href = currentAudioUrl;
+        a.download = 'speech.mp3';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        updateStatus(chrome.i18n.getMessage("audioDownloaded") || 'Audio downloaded', false);
+      }
+    });
+  }
+
   // Listen for messages from background script
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
@@ -288,17 +366,31 @@ document.addEventListener('DOMContentLoaded', async function() {
         currentAudioUrl = message.audioUrl;
         break;
         
+      case 'streamFinished':
+        // Backend finished generating all chunks
+        isGenerating = false;
+        const statusBtnEl = document.getElementById('statusBtn');
+        const dBtn = document.getElementById('downloadBtn');
+        const isRecordEnabled = cachedSettings.recordAudio;
+        if (statusBtnEl) statusBtnEl.innerHTML = chrome.i18n.getMessage("readBtn") || 'READ';
+        if (dBtn && currentAudioUrl && isRecordEnabled) dBtn.disabled = false;
+        break;
+        
       case 'streamError':
-        updateStatus(message.error, true);
+        isGenerating = false;
+        updateStatus(message.error || chrome.i18n.getMessage("streamErrorOccurred") || 'Stream error occurred', true);
         updateControlButtons('stopped');
         break;
         
       case 'timeUpdate':
-        if (message.timeInfo && !seekBar.classList.contains('seeking')) {
-          seekBar.max = message.timeInfo.duration;
-          seekBar.value = message.timeInfo.currentTime;
-          document.getElementById('currentTime').textContent = formatTime(message.timeInfo.currentTime);
-          document.getElementById('duration').textContent = formatTime(message.timeInfo.duration);
+        const sb = document.getElementById('seekBar');
+        if (message.timeInfo && sb && !sb.classList.contains('seeking')) {
+          sb.max = message.timeInfo.duration;
+          sb.value = message.timeInfo.currentTime;
+          const cur = document.getElementById('currentTime');
+          const dur = document.getElementById('duration');
+          if (cur) cur.textContent = formatTime(message.timeInfo.currentTime);
+          if (dur) dur.textContent = formatTime(message.timeInfo.duration);
         }
         break;
     }
